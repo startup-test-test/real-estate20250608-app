@@ -218,9 +218,9 @@ if 'simulation_results' not in st.session_state:
 if 'market_analysis' not in st.session_state:
     st.session_state.market_analysis = None
 
-# APIキーを環境変数から読み込み（UIには表示しない）
-openai_api_key = os.getenv("OPENAI_API_KEY", "")
-real_estate_api_key = os.getenv("REAL_ESTATE_API_KEY", "")
+# Streamlit Cloudでは.envは不要、Secretsから取得
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+real_estate_api_key = st.secrets["REAL_ESTATE_API_KEY"]
 
 # ヘッダー
 st.markdown("""
