@@ -218,9 +218,15 @@ if 'simulation_results' not in st.session_state:
 if 'market_analysis' not in st.session_state:
     st.session_state.market_analysis = None
 
-# Streamlit Cloudでは.envは不要、Secretsから取得
-openai_api_key = st.secrets["OPENAI_API_KEY"]
-real_estate_api_key = st.secrets["REAL_ESTATE_API_KEY"]
+# APIキーの取得（Streamlit CloudではSecretsから、ローカルでは環境変数から）
+try:
+    # Streamlit Cloudの場合
+    openai_api_key = st.secrets["OPENAI_API_KEY"]
+    real_estate_api_key = st.secrets["REAL_ESTATE_API_KEY"]
+except Exception:
+    # ローカル開発環境の場合は環境変数から取得
+    openai_api_key = os.getenv("OPENAI_API_KEY", "")
+    real_estate_api_key = os.getenv("REAL_ESTATE_API_KEY", "")
 
 # ヘッダー
 st.markdown("""
@@ -230,19 +236,40 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# 初回設定の警告表示
+if not openai_api_key and not real_estate_api_key:
+    st.warning("""
+    ⚠️ **初回設定が必要です**
+    
+    Streamlit Cloudで動作させるには、以下の手順でAPIキーを設定してください：
+    
+    1. アプリの右上のメニューから「Settings」を選択
+    2. 「Secrets」セクションを開く
+    3. 以下の形式でAPIキーを追加：
+    ```
+    OPENAI_API_KEY = "your-actual-openai-api-key"
+    REAL_ESTATE_API_KEY = "your-actual-real-estate-api-key"
+    ```
+    4. 「Save」をクリックしてアプリを再起動
+    
+    ※ APIキーがなくても基本的なシミュレーション機能は利用可能です。
+    """)
+
 # APIキーの状態を確認（デバッグ用）
 with st.expander("🔧 API設定状況", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
-        if openai_api_key and openai_api_key != "your-openai-api-key-here":
+        if openai_api_key and openai_api_key != "your-openai-api-key-here" and openai_api_key != "":
             st.success("✅ OpenAI API: 設定済み")
         else:
             st.error("❌ OpenAI API: 未設定")
+            st.info("Streamlit Cloudの場合: Settings → Secrets に OPENAI_API_KEY を追加してください")
     with col2:
-        if real_estate_api_key and real_estate_api_key != "your-real-estate-api-key-here":
+        if real_estate_api_key and real_estate_api_key != "your-real-estate-api-key-here" and real_estate_api_key != "":
             st.success("✅ 不動産API: 設定済み")
         else:
             st.error("❌ 不動産API: 未設定")
+            st.info("Streamlit Cloudの場合: Settings → Secrets に REAL_ESTATE_API_KEY を追加してください")
 
 # メインコンテンツ - タブ構成
 tab1, tab2, tab3, tab4 = st.tabs([
