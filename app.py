@@ -271,6 +271,89 @@ with st.expander("🔧 API設定状況", expanded=False):
             st.error("❌ 不動産API: 未設定")
             st.info("Streamlit Cloudの場合: Settings → Secrets に REAL_ESTATE_API_KEY を追加してください")
 
+# OpenAI クライアントの初期化
+client = None
+if openai_api_key:
+    try:
+        client = OpenAI(api_key=openai_api_key)
+    except Exception as e:
+        st.error(f"OpenAI APIの初期化に失敗しました: {str(e)}")
+
+# AI診断関数
+def get_ai_analysis(property_data: Dict, simulation_results: Dict) -> str:
+    """
+    物件情報とシミュレーション結果を基にAI診断を生成
+    """
+    if not client:
+        return "OpenAI APIキーが設定されていないため、AI診断を実行できません。"
+    
+    try:
+        # プロンプトの構築
+        prompt = f"""
+        以下の不動産投資物件について、プロの投資アドバイザーとして詳細な診断を行ってください。
+
+        ## 物件情報
+        - 物件名: {property_data.get('property_name', '未入力')}
+        - 所在地: {property_data.get('location', '未入力')}
+        - 築年数: {property_data.get('building_age', 0)}年
+        - 構造: {property_data.get('structure', '未入力')}
+        - 総戸数: {property_data.get('total_units', 0)}戸
+        - 専有面積: {property_data.get('area', 0)}㎡
+        - 間取り: {property_data.get('layout', '未入力')}
+        
+        ## 投資条件
+        - 物件価格: {property_data.get('price', 0):,}万円
+        - 初期費用: {property_data.get('initial_cost', 0):,}万円
+        - 自己資金: {property_data.get('down_payment', 0):,}万円
+        - 借入金額: {property_data.get('loan_amount', 0):,}万円
+        - 金利: {property_data.get('interest_rate', 0)}%
+        - 返済期間: {property_data.get('loan_term', 0)}年
+        
+        ## 収支予想
+        - 想定家賃: {property_data.get('monthly_rent', 0):,}円/月
+        - 管理費等: {property_data.get('monthly_costs', 0):,}円/月
+        - 固定資産税: {property_data.get('property_tax', 0):,}円/年
+        - 空室率: {property_data.get('vacancy_rate', 0)}%
+        
+        ## シミュレーション結果
+        - 表面利回り: {simulation_results.get('surface_yield', 0):.2f}%
+        - 実質利回り: {simulation_results.get('real_yield', 0):.2f}%
+        - 月間キャッシュフロー: {simulation_results.get('monthly_cashflow', 0):,}円
+        - 年間キャッシュフロー: {simulation_results.get('annual_cashflow', 0):,}円
+        
+        以下の形式で診断結果を作成してください：
+        
+        ## 🎯 投資判断: ★の数で5段階評価（例：★★★☆☆（3/5））
+        
+        ### 💪 強み
+        1. 具体的な強みを3つ
+        
+        ### ⚠️ リスク
+        1. 具体的なリスクを3つ
+        
+        ### 🔧 改善提案
+        1. 具体的な改善案を3つ
+        
+        ### 📝 総合アドバイス
+        この物件への投資について、総合的なアドバイスを記載
+        """
+        
+        # OpenAI APIを呼び出し
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "あなたは経験豊富な不動産投資アドバイザーです。客観的で実践的なアドバイスを提供してください。"},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1500,
+            temperature=0.7
+        )
+        
+        return response.choices[0].message.content
+    
+    except Exception as e:
+        return f"AI診断の実行中にエラーが発生しました: {str(e)}"
+
 # メインコンテンツ - タブ構成
 tab1, tab2, tab3, tab4 = st.tabs([
     "📝 物件情報入力",
@@ -950,30 +1033,42 @@ with tab4:
     if st.button("🤖 AI診断を実行", type="primary", use_container_width=True):
         with st.spinner("AI分析中..."):
             if st.session_state.simulation_results:
-                # サンプル診断を表示
-                st.session_state.ai_diagnosis = """
-                ## 🎯 投資判断: ★★★☆☆（3/5）
-
-                ### 💪 強み
-                1. **立地条件**: 都心へのアクセスが良好で、賃貸需要が安定
-                2. **利回り水準**: 表面利回りは都心部としては標準的
-                3. **将来性**: エリアの再開発により、長期的な資産価値向上が期待可能
-
-                ### ⚠️ リスク
-                1. **築年数**: 築年数が経過しており、大規模修繕のリスクあり
-                2. **空室リスク**: 競合物件が多いエリアのため、差別化が必要
-                3. **金利上昇**: 将来的な金利上昇により収益性が低下する可能性
-
-                ### 🔧 改善提案
-                1. **リノベーション**: 適切な投資で家賃を5-10%向上可能
-                2. **管理効率化**: 管理費の見直しで月額コストを削減可能
-                3. **付加価値サービス**: IoT設備導入で差別化を図る
-
-                ### 📝 総合アドバイス
-                この物件は立地条件に優れていますが、築年数を考慮すると慎重な判断が必要です。
-                購入を進める場合は、建物調査を実施し、長期的な修繕計画を明確にすることを推奨します。
-                適切なリノベーションと管理により、安定した収益が期待できる物件と判断します。
-                """
+                # 物件情報を収集
+                current_year = datetime.now().year
+                building_age = current_year - year_built if 'year_built' in locals() else 0
+                
+                property_data = {
+                    'property_name': property_name if 'property_name' in locals() else '未入力',
+                    'location': location if 'location' in locals() else '未入力',
+                    'building_age': building_age,
+                    'structure': structure if 'structure' in locals() else 'RC',
+                    'total_units': total_units if 'total_units' in locals() else 0,
+                    'area': area if 'area' in locals() else 0,
+                    'layout': layout if 'layout' in locals() else '未入力',
+                    'price': purchase_price if 'purchase_price' in locals() else 0,
+                    'initial_cost': other_costs if 'other_costs' in locals() else 0,
+                    'down_payment': purchase_price - loan_amount if 'loan_amount' in locals() else 0,
+                    'loan_amount': loan_amount if 'loan_amount' in locals() else 0,
+                    'interest_rate': interest_rate if 'interest_rate' in locals() else 0,
+                    'loan_term': loan_years if 'loan_years' in locals() else 0,
+                    'monthly_rent': monthly_rent if 'monthly_rent' in locals() else 0,
+                    'monthly_costs': management_fee + fixed_cost if 'management_fee' in locals() else 0,
+                    'property_tax': property_tax if 'property_tax' in locals() else 0,
+                    'vacancy_rate': vacancy_rate if 'vacancy_rate' in locals() else 0
+                }
+                
+                # シミュレーション結果を収集
+                results = st.session_state.simulation_results['results']
+                simulation_data = {
+                    'surface_yield': results['表面利回り（%）'],
+                    'real_yield': results.get('実質利回り（%）', 0),
+                    'monthly_cashflow': results['月間キャッシュフロー（円）'],
+                    'annual_cashflow': results['年間キャッシュフロー（円）']
+                }
+                
+                # AI診断を実行
+                ai_result = get_ai_analysis(property_data, simulation_data)
+                st.session_state.ai_diagnosis = ai_result
             else:
                 st.warning("先にシミュレーションを実行してください")
     
