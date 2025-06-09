@@ -275,7 +275,20 @@ with st.expander("🔧 API設定状況", expanded=False):
 client = None
 if openai_api_key:
     try:
+        # 環境変数のプロキシ設定を一時的にクリア
+        import os
+        proxy_vars = ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']
+        saved_proxies = {}
+        for var in proxy_vars:
+            if var in os.environ:
+                saved_proxies[var] = os.environ[var]
+                del os.environ[var]
+        
         client = OpenAI(api_key=openai_api_key)
+        
+        # プロキシ設定を復元
+        for var, value in saved_proxies.items():
+            os.environ[var] = value
     except Exception as e:
         st.error(f"OpenAI APIの初期化に失敗しました: {str(e)}")
 
