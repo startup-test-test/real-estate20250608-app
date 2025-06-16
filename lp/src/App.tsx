@@ -152,7 +152,7 @@ function App() {
             <div className="relative">
               <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
                 <img 
-                  src="/メインビジュアルの右画像 copy.png" 
+                  src="./メインビジュアルの右画像.png" 
                   alt="大家DXのダッシュボード画面"
                   className="w-full h-auto"
                 />
