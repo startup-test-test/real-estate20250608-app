@@ -192,3 +192,16 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore.streamlit/secrets.toml
+
+# Backend specific
+backend/.env
+backend/venv/
+backend/.streamlit/secrets.toml
+backend/__pycache__/
+
+# IDE and OS specific
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
